@@ -1,0 +1,47 @@
+const { Client, GatewayIntentBits } = require('discord.js');
+const { status } = require('minecraft-server-util');
+const express = require('express');
+
+// ----- Keep-alive web server -----
+const app = express();
+app.get('/', (req, res) => res.send('Bot is alive!'));
+app.listen(3000, () => console.log('Web server running on port 3000'));
+
+// ----- Discord bot -----
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
+});
+
+// ----- Minecraft status command -----
+client.on('messageCreate', async message => {
+    if (!message.content.startsWith('!mcstatus')) return;
+
+    const args = message.content.split(' ');
+    if (!args[1]) return message.channel.send('Please provide server IP');
+
+    const ip = args[1];
+    const port = args[2] ? parseInt(args[2]) : 25565;
+
+    try {
+        const result = await status(ip, { port });
+        message.channel.send(
+            `**Server IP:** ${ip}\n` +
+            `**Players:** ${result.players.online}/${result.players.max}\n` +
+            `**Latency:** ${result.roundTripLatency} ms`
+        );
+    } catch (err) {
+        message.channel.send(`Error: Could not reach server.\n${err}`);
+    }
+});
+
+// ----- Bot ready -----
+client.once('ready', () => {
+    console.log(`Logged in as ${client.user.tag} ✅`);
+});
+
+// ----- Run bot with token from Render -----
+client.login(process.env.DISCORD_TOKEN);
